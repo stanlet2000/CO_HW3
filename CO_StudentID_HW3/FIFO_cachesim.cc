@@ -48,7 +48,10 @@ void cache_sim_t::init()
   for (size_t x = linesz; x>1; x >>= 1)
     idx_shift++;
 
-  tags = new uint64_t[sets*ways]();
+  next_way = new size_t[sets]();	//edit
+  
+  tags = new uint64_t[sets*ways]();  
+  
   read_accesses = 0;
   read_misses = 0;
   bytes_read = 0;
@@ -66,11 +69,13 @@ cache_sim_t::cache_sim_t(const cache_sim_t& rhs)
 {
   tags = new uint64_t[sets*ways];
   memcpy(tags, rhs.tags, sets*ways*sizeof(uint64_t));
+  next_way = new size_t[sets]();	//edit
 }
 
 cache_sim_t::~cache_sim_t()
 {
   print_stats();
+  delete [] next_way;	//edit
   delete [] tags;
 }
 
@@ -115,9 +120,10 @@ uint64_t* cache_sim_t::check_tag(uint64_t addr)
 uint64_t cache_sim_t::victimize(uint64_t addr)
 {
   size_t idx = (addr >> idx_shift) & (sets-1);
-  size_t way = lfsr.next() % ways;
-  uint64_t victim = tags[idx*ways + way];
-  tags[idx*ways + way] = (addr >> idx_shift) | VALID;
+  //size_t way = lfsr.next() % ways;
+  uint64_t victim = tags[idx*ways + next_way[idx]];	//edit
+  tags[idx*ways + next_way[idx]] = (addr >> idx_shift) | VALID;	//edit
+  next_way[idx] = (next_way[idx] + 1)%ways;	//edit
   return victim;
 }
 
@@ -201,9 +207,11 @@ uint64_t fa_cache_sim_t::victimize(uint64_t addr)
   if (tags.size() == ways)
   {
     auto it = tags.begin();
-    std::advance(it, lfsr.next() % ways);
+    //std::advance(it, lfsr.next() % ways);
+    std::advance(it, next_way[0]);	//edit
     old_tag = it->second;
     tags.erase(it);
+    next_way[0] = (next_way[0] + 1) % ways;	//edit
   }
   tags[addr >> idx_shift] = (addr >> idx_shift) | VALID;
   return old_tag;
