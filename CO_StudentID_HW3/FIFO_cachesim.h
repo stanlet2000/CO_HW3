@@ -50,6 +50,8 @@ class cache_sim_t
   size_t linesz;
   size_t idx_shift;
 
+  size_t* next_way;	//edit
+
   uint64_t* tags;
   
   uint64_t read_accesses;
