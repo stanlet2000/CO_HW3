@@ -48,7 +48,11 @@ void cache_sim_t::init()
   for (size_t x = linesz; x>1; x >>= 1)
     idx_shift++;
 
-  tags = new uint64_t[sets*ways]();
+  next_way = new size_t[sets]();	//edit
+  lru = new size_t[sets*ways]();	//edit
+  
+  tags = new uint64_t[sets*ways]();  
+  
   read_accesses = 0;
   read_misses = 0;
   bytes_read = 0;
@@ -66,11 +70,15 @@ cache_sim_t::cache_sim_t(const cache_sim_t& rhs)
 {
   tags = new uint64_t[sets*ways];
   memcpy(tags, rhs.tags, sets*ways*sizeof(uint64_t));
+  next_way = new size_t[sets]();	//edit
+  lru = new size_t[sets*ways]();		//edit
 }
 
 cache_sim_t::~cache_sim_t()
 {
   print_stats();
+  delete [] next_way;	//edit
+  delete [] lru;	//edit
   delete [] tags;
 }
 
@@ -105,19 +113,38 @@ uint64_t* cache_sim_t::check_tag(uint64_t addr)
   size_t idx = (addr >> idx_shift) & (sets-1);
   size_t tag = (addr >> idx_shift) | VALID;
 
-  for (size_t i = 0; i < ways; i++)
-    if (tag == (tags[idx*ways + i] & ~DIRTY))
-      return &tags[idx*ways + i];
-
+  for (size_t i = 0; i < ways; i++){
+    if (tag == (tags[idx*ways + i] & ~DIRTY)){
+		  for(size_t j = 0; j < ways; j++){		//edit
+		  	if(lru[idx*ways + j] > 0 && lru[idx*ways + j] < lru[idx*ways + i]){
+		  		lru[idx*ways + j]++;
+		  	}
+		  }
+		  lru[idx*ways + i] = 1;	//edit
+		  return &tags[idx*ways + i];
+      }
+	}
   return NULL;
 }
 
 uint64_t cache_sim_t::victimize(uint64_t addr)
 {
   size_t idx = (addr >> idx_shift) & (sets-1);
-  size_t way = lfsr.next() % ways;
-  uint64_t victim = tags[idx*ways + way];
-  tags[idx*ways + way] = (addr >> idx_shift) | VALID;
+  //size_t way = lfsr.next() % ways;
+  uint64_t victim = tags[idx*ways + next_way[idx]];	//edit
+  for(size_t i = 0; i < ways; i++){
+  	if(lru[idx*ways + i] % ways != 0){
+  		lru[idx*ways + i]++;
+  	}
+  }
+  lru[idx*ways + next_way[idx]] = 1;	//edit
+  tags[idx*ways + next_way[idx]] = (addr >> idx_shift) | VALID;	//edit
+  for(size_t i = 0; i < ways; i++){		//edit
+  	if(lru[idx*ways + i] % ways == 0){
+  		next_way[idx] = i;
+  		break;
+  	}
+  }
   return victim;
 }
 
@@ -192,6 +219,15 @@ fa_cache_sim_t::fa_cache_sim_t(size_t ways, size_t linesz, const char* name)
 uint64_t* fa_cache_sim_t::check_tag(uint64_t addr)
 {
   auto it = tags.find(addr >> idx_shift);
+  size_t w = distance(tags.begin(), it);	//edit
+  if(it != tags.end()){
+  	for(size_t i = 0; i < ways; i++){
+  		if(lru[i] > 0 && lru[i] < lru[w]){
+  			lru[i]++;
+  		}
+  	}
+  	lru[w] = 1;
+  }	//edit
   return it == tags.end() ? NULL : &it->second;
 }
 
@@ -201,9 +237,22 @@ uint64_t fa_cache_sim_t::victimize(uint64_t addr)
   if (tags.size() == ways)
   {
     auto it = tags.begin();
-    std::advance(it, lfsr.next() % ways);
+    //std::advance(it, lfsr.next() % ways);
+    std::advance(it, next_way[0]);	//edit
     old_tag = it->second;
     tags.erase(it);
+    for(size_t i = 0; i < ways; i++){	//edit
+	  	if(lru[i] % ways != 0){
+	  		lru[i]++;
+	  	}
+	  }
+	lru[next_way[0]] = 1;
+    for(size_t i = 0; i < ways; i++){		
+	  	if(lru[i] % ways == 0){
+	  		next_way[0] = i;
+	  		break;
+	  	}
+	  }	//edit
   }
   tags[addr >> idx_shift] = (addr >> idx_shift) | VALID;
   return old_tag;

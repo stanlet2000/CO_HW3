@@ -6,7 +6,7 @@ CACHE_WAY = ''
 CACHE_BLOCKSIZE = ''
 
 PK_PATH = /home/ubuntu/riscv/riscv64-unknown-elf/bin/pk
-FILE_NAME = ''
+FILE_NAME = ORIG_cachesim.cc
 SPIKE_PATH = ${HOME}/Downloads/riscv-isa-sim/
 
 test:
