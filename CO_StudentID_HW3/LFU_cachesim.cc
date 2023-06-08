@@ -218,14 +218,16 @@ uint64_t* fa_cache_sim_t::check_tag(uint64_t addr)
 {
   auto it = tags.find(addr >> idx_shift);
   size_t w = distance(tags.begin(), it);	//edit
-  freq[w]++;
-  size_t min = freq[next_way[0]];	//adjust next_way
-	for(size_t i = 0; i < ways; i++){	
-		if(min > freq[i]){
-			next_way[0] = i;
-			min = freq[i];
-		}
-	}	//edit
+  if(it != tags.end()){
+		freq[w]++;
+		size_t min = freq[next_way[0]];	//adjust next_way
+		for(size_t i = 0; i < ways; i++){	
+			if(min > freq[i]){
+				next_way[0] = i;
+				min = freq[i];
+			}
+		}	//edit
+	}
   return it == tags.end() ? NULL : &it->second;
 }
 
@@ -241,12 +243,12 @@ uint64_t fa_cache_sim_t::victimize(uint64_t addr)
     tags.erase(it);
     freq[next_way[0]] = 1;	//edit
     size_t min = freq[next_way[0]];	//adjust next_way
-	for(size_t i = 0; i < ways; i++){	
-		if(min > freq[i]){
-			next_way[0] = i;
-			min = freq[i];
-		}
-	}	//edit
+		for(size_t i = 0; i < ways; i++){	
+			if(min > freq[i]){
+				next_way[0] = i;
+				min = freq[i];
+			}
+		}	//edit
   }
   tags[addr >> idx_shift] = (addr >> idx_shift) | VALID;
   return old_tag;
