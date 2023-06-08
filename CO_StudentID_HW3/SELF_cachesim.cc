@@ -6,6 +6,18 @@
 #include <iostream>
 #include <iomanip>
 
+
+float F(int x){	//edit
+	float value = 1;
+	if(x >= 0){
+		for(int i = 0; i < x; i++){
+			value *= 0.5;
+		}
+		return value;
+	}
+	exit(1);
+}
+
 cache_sim_t::cache_sim_t(size_t _sets, size_t _ways, size_t _linesz, const char* _name)
 : sets(_sets), ways(_ways), linesz(_linesz), name(_name), log(false)
 {
@@ -48,6 +60,11 @@ void cache_sim_t::init()
   for (size_t x = linesz; x>1; x >>= 1)
     idx_shift++;
 
+	next_way = new size_t[sets]();	//edit
+	timer = 0;	//edit
+	last = new int[sets*ways]();	//edit
+	C = new float[sets*ways]();	//edit
+
   tags = new uint64_t[sets*ways]();
   read_accesses = 0;
   read_misses = 0;
@@ -66,12 +83,17 @@ cache_sim_t::cache_sim_t(const cache_sim_t& rhs)
 {
   tags = new uint64_t[sets*ways];
   memcpy(tags, rhs.tags, sets*ways*sizeof(uint64_t));
+  next_way = new size_t[sets]();	//edit
+  timer = 0;	//edit
+  last = new int[sets*ways]();	//edit
+  C = new float[sets*ways]();	//edit
 }
 
 cache_sim_t::~cache_sim_t()
 {
   print_stats();
   delete [] tags;
+  delete [] next_way;	//edit
 }
 
 void cache_sim_t::print_stats()
@@ -104,20 +126,46 @@ uint64_t* cache_sim_t::check_tag(uint64_t addr)
 {
   size_t idx = (addr >> idx_shift) & (sets-1);
   size_t tag = (addr >> idx_shift) | VALID;
+  timer++;
 
-  for (size_t i = 0; i < ways; i++)
-    if (tag == (tags[idx*ways + i] & ~DIRTY))
+  for (size_t i = 0; i < ways; i++){
+    if (tag == (tags[idx*ways + i] & ~DIRTY)){
+    	for(size_t j = 0; j < sets*ways; j++){	//edit
+    		C[j] = F(timer - last[j]) * C[j];
+    	}
+    	last[idx*ways + i] = timer;
+    	C[idx*ways + i]++;
+    	float min = C[idx*ways + next_way[idx]];
+    	for(size_t j = 0; j < ways; j++){
+    		if(min > C[idx*ways + j]){
+    			min = C[idx*ways + j];	
+					next_way[idx] = j;
+    		}
+    	}	//edit
       return &tags[idx*ways + i];
-
+  	}
+	}
   return NULL;
 }
 
 uint64_t cache_sim_t::victimize(uint64_t addr)
 {
   size_t idx = (addr >> idx_shift) & (sets-1);
-  size_t way = lfsr.next() % ways;
-  uint64_t victim = tags[idx*ways + way];
-  tags[idx*ways + way] = (addr >> idx_shift) | VALID;
+  //size_t way = lfsr.next() % ways;
+  uint64_t victim = tags[idx*ways + next_way[idx]];	//edit
+  for(size_t i = 0; i < sets*ways; i++){
+  	C[i] = F(timer - last[i]) * C[i];
+  }
+  C[idx*ways + next_way[idx]] = 1;
+  last[idx*ways + next_way[idx]] = timer;
+  float min = 1;
+  for(size_t i = 0; i < ways; i++){
+  	if(min > C[idx*ways + i]){
+  		min = C[idx*ways + i];
+  		next_way[idx] = i;
+  	}
+  }	//edit
+  tags[idx*ways + next_way[idx]] = (addr >> idx_shift) | VALID;	//edit
   return victim;
 }
 
@@ -192,6 +240,21 @@ fa_cache_sim_t::fa_cache_sim_t(size_t ways, size_t linesz, const char* name)
 uint64_t* fa_cache_sim_t::check_tag(uint64_t addr)
 {
   auto it = tags.find(addr >> idx_shift);
+  size_t w = distance(tags.begin(), it);	//edit
+  if(it != tags.end()){
+  	for(size_t i = 0; i < ways; i++){
+  		C[i] = F(timer - last[i]) * C[i];
+  	}
+  	C[w]++;
+  	last[w] = timer;
+  	float min = C[next_way[0]];	//adjust next_way
+  	for(size_t i = 0; i < ways; i++){
+  		if(min > C[i]){
+  			min = C[i];
+  			next_way[0] = i;
+  		}
+  	}
+  }	//edit
   return it == tags.end() ? NULL : &it->second;
 }
 
@@ -201,9 +264,19 @@ uint64_t fa_cache_sim_t::victimize(uint64_t addr)
   if (tags.size() == ways)
   {
     auto it = tags.begin();
-    std::advance(it, lfsr.next() % ways);
+    //std::advance(it, lfsr.next() % ways);
+    std::advance(it, next_way[0]);	//edit
     old_tag = it->second;
     tags.erase(it);
+    C[next_way[0]] = 1;
+    last[next_way[0]] = timer;
+    float min = 1;	//adjust next_way
+    for(size_t i = 0; i < ways; i++){
+    	if(min > C[i]){
+    		min = C[i];
+    		next_way[0] = i;
+    	}
+    }	//edit
   }
   tags[addr >> idx_shift] = (addr >> idx_shift) | VALID;
   return old_tag;

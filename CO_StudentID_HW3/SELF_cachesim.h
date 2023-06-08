@@ -10,6 +10,9 @@
 #include <map>
 #include <cstdint>
 
+
+float F(int x);	//edit
+
 class lfsr_t
 {
  public:
@@ -49,6 +52,11 @@ class cache_sim_t
   size_t ways;
   size_t linesz;
   size_t idx_shift;
+  
+  size_t* next_way;	//edit
+  int timer;	//edit
+  int* last;	//edit
+  float* C;	//edit
 
   uint64_t* tags;
   
