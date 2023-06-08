@@ -120,7 +120,13 @@ uint64_t* cache_sim_t::check_tag(uint64_t addr)
 		  		lru[idx*ways + j]++;
 		  	}
 		  }
-		  lru[idx*ways + i] = 1;	//edit
+		  lru[idx*ways + i] = 1;
+		  for(size_t i = 0; i < ways; i++){		
+		  	if(lru[idx*ways + i] % ways == 0){
+		  		next_way[idx] = i;
+		  		break;
+		  	}
+		  }	//edit
 		  return &tags[idx*ways + i];
       }
 	}
@@ -227,6 +233,12 @@ uint64_t* fa_cache_sim_t::check_tag(uint64_t addr)
   		}
   	}
   	lru[w] = 1;
+  	for(size_t i = 0; i < ways; i++){	
+	  	if(lru[i] % ways == 0){
+	  		next_way[0] = i;
+	  		break;
+	  	}
+	  }
   }	//edit
   return it == tags.end() ? NULL : &it->second;
 }
